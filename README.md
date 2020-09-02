@@ -162,7 +162,7 @@ mdadm: Defaulting to version 1.2 metadata
 mdadm: array /dev/md0 started.
 ```
 
-6. Monitor the syncing
+7. Monitor the syncing
 
 `watch cat /proc/mdstat`
 
@@ -191,7 +191,7 @@ md0 : active raid1 sdb[1] sda[0]
 unused devices: <none>
 ```
 
-7. Create ext4 filesystem on RAID 1
+8. Create ext4 filesystem on RAID 1
 `sudo mkfs.ext4 -F /dev/md0`
 
 >you'll get a similar output to the below, just give it a moment, depending on disk size
@@ -209,15 +209,15 @@ Creating journal (16384 blocks): done
 Writing superblocks and filesystem accounting information: done 
 ```
 
-8. Create mount point for the RAID
+9. Create mount point for the RAID
 
 `sudo mkdir -p /mnt/md0`
 
-9. Mount the RAID
+10. Mount the RAID
 
 `sudo mount /dev/md0 /mnt/md0`
 
-10. Check that drive is mounted and how much space it has
+11. Check that drive is mounted and how much space it has
 `sudo mdadm -D /dev/md0`
 
 >output should look similar to below
