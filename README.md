@@ -3,6 +3,10 @@
 >RAID 1 configured with `mdadm`
 >
 >NAS configured `netatalk` on AFP
+>
+>This allows you to drag and drop files to and from your computer and the RPi's Storage over your WiFi
+>
+>RAID ensures that if one disk fails your data is still 'alive' on the other disk(s)
 
 ### Mininum Hardware Required:
 >Raspberry Pi
@@ -43,17 +47,21 @@ https://www.raspberrypi.org/downloads/raspberry-pi-os/
 
 2. Download Balena Etcher, for flashing the OS to the microSD
 https://www.balena.io/etcher/
+>you will have to install the `balenaEtcher-*.dmg` but that should be straight forward, it's an app like any other
 
 ![downloadbalena](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/downloadbalena.png?raw=true)
 
 3. Connect microSD to your computer, via adapter
 ![SDadapterInComputer](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/SDadapterInComputer.JPG?raw=true)
 4. Open Balena Etcher app and follow the Balena Etcher GUI steps
+
     ![selectImage](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/selectImage.png?raw=true)
     - select the RPiOS Lite Image, .img file
     ![selectImage2](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/selectImage2.png?raw=true)
     - select the disk to flash it to and "Flash!" it, be VERY CAREFUL, DO NOT FLASH your HD
     ![selectDrive](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/selectDrive.png?raw=true)
+    ![flash](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/flash.png?raw=true)
+    ![flashing](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/flashing.png?raw=true)
     - you can look at the Disk Utility app (native to Apple) and make sure it's the microSD you are flashing and NOT your computers HD
     ![checkThatDriveCorrect](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/checkThatDriveCorrect.png?raw=true)
     
@@ -63,7 +71,7 @@ https://www.balena.io/etcher/
 ![ejectSDadapter](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/ejectSDadapter.png?raw=true)
 6. Reconnect the microSD to your computer and open up your Shell, I use the Terminal app
 ![diskutilafterflash](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/diskutilafterflash.png?raw=true)
-7. Create the `ssh` file by typing the below command into the Terminal
+7. Create the `ssh` file by typing the following command into the Terminal
 
 `touch /Volumes/boot/ssh`
 
@@ -110,7 +118,7 @@ mmcblk0     179:0    0 29.8G  0 disk
 >
 >you can wipe both simultaneously, just open up another shell (Terminal) and wipe the other disk in there, so they'll be running concurrently in different windows
 >
-`sudo dd if=/dev/zero of=/dev/sdX bs=1M progress=status`
+`sudo dd if=/dev/zero of=/dev/sdX bs=1M status=progress`
 >where the `X` in `sdX` is either `a` in `sda`, or `b` in `sdb`, etc for all drives you use in this experiment
 >
 > there are best practices for `bs=someValue` but for this tutorial we'll keep it simple
@@ -251,15 +259,22 @@ Consistency Policy : resync
 
 ##  Step 3 - Install `netatalk` and configure NAS
 
-1. install netatalk, you should be logged into the RPi for these steps as well
-`apt-get install netatalk`
+1. Install netatalk, you should be logged into the RPi for these steps as well
 
-2. configure netatalk
+`sudo apt-get install netatalk -y`
+
+2. Configure netatalk
+
 `sudo nano /etc/netatalk/afp.conf`
 
 >defines home directory, allows users to access ‘home’ folder, I named mine `My RAID` with a directory name of `my_raid`
 >
->unless you are using a different distribution than I am RPi OS Lite then you shouldn't have to worry about the path being incorrect
+>`/media/my_raid/shared` is the full path to the accessible portion of the RAID
+>
+>unless you are using a different distribution than I am RPi OS Lite then you shouldn't have to worry about the path being incorrect, you can name the `my_raid` portion whatever you like
+
+- edit the configuration file to reflect the below entry, either by the modifiying `[My AFP Volume]` entry or by adding your own, uncommented entry
+>if it is 'commented out' then the configuration won't be read by the program
 
 ```
 [My RAID]
@@ -267,13 +282,17 @@ path = /media/my_raid/shared
 ; are comments, again semi-colons are comments
 ```	
 
-3. Make directory raid
+3. Make directory RAID
+
 `sudo mkdir /media/my_raid`
 
 4. List out RAID with disks UUID's
+
 `lsblk --fs | grep md0`
 - copy UUID
->mine looks like `f3e988bf-2f9a-4637-9ae6-f4e451b18526`
+>mine looks like
+>
+>`f3e988bf-2f9a-4637-9ae6-f4e451b18526`
 >
 >will be similar to the below
 
@@ -282,10 +301,12 @@ path = /media/my_raid/shared
 └─md0       ext4                           f3e988bf-2f9a-4637-9ae6-f4e451b18526    3.4G     0% /mnt/md0
 ```
 
-5. Add UUID as entry to fstab
+5. Add copied UUID as entry to fstab
 
 `sudo nano /etc/fstab`
-- add `UUID=f3e988bf-2f9a-4637-9ae6-f4e451b18526  /media/my_raid  ext4  defaults  0  2` to the below entry
+- add `UUID=f3e988bf-2f9a-4637-9ae6-f4e451b18526  /media/my_raid  ext4  defaults  0  2` to the bottom of fstab, make sure the UUID is equal to what you copied in step 4
+
+`/etc/fstab` file will look like the following
 
 ```
 proc            /proc           proc    defaults          0       0
@@ -321,6 +342,30 @@ PARTUUID=853f83f4-02  /               ext4    defaults,noatime  0       1
 └─md0       ext4                           f3e988bf-2f9a-4637-9ae6-f4e451b18526    2.1G    36% /media/my_raid
 └─md0       ext4                           f3e988bf-2f9a-4637-9ae6-f4e451b18526    2.1G    36% /media/my_raid
 ```
+
+## Step 4 - Connect to RAID Storage from Computer
+1. Open a Finder window, method differs for MacOS 10.13 and 10.14 or higher
+- In the Finder's sidebar
+![sidebar](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/sidebar.png?raw=true)
+    - For 10.13 and below, under `Shared` look for the RPi's `hostname`
+    
+    ![shared](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/shared.png?raw=true)
+    - For 10.14 and above, under `Locations` look for the RPi's `hostname` or `Network`
+        - if you don't see the `hostname` under `Locations` then select `Network`, under `Locations` and select the `hostname`
+        ![Network](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/Network.png?raw=true)
+
+2. Select and open `hostname`
+![cloudspace](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/cloudspace.png?raw=true)
+
+> You'll be put into a Finder window that states it is 'Not Connected'
+![notConnected](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/notConnected.png?raw=true)
+
+3. Select `Connect As` and fill out credentials
+![loginToRAID](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/loginToRAID.png?raw=true)
+
+>Now you should be logged in, you can open `My Raid` and start storing data in it
+![connected](https://github.com/MasonMcGerry/RemoteNASRAID/blob/master/Images/connected.png?raw=true)
+>You can drag from your desktop to the RAID storage, and from the RAID storage to your desktop
 
 ### All Done!
 - I'll be adding more to this README.md
@@ -415,3 +460,7 @@ https://www.digitalocean.com/community/tutorials/how-to-manage-raid-arrays-with-
 https://superuser.com/questions/471327/how-to-force-mdadm-to-stop-raid5-array
 
 https://beamtic.com/dd-no-space-left-on-device
+
+https://support.apple.com/guide/mac-help/connect-shared-computers-file-servers-a-mchlp1140/10.13/mac/10.13
+
+https://support.apple.com/guide/mac-help/connect-mac-shared-computers-servers-mchlp1140/10.15/mac/10.15
